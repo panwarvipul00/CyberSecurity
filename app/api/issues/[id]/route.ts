@@ -1,25 +1,32 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { connectDB } from "@/lib/db";
 import Issue from "@/models/Issue";
 
-// GET single issue
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
+type JwtPayload = {
+  id: string;
+};
+
+export async function DELETE(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
-    const { id } = await params;
+    const { id } = await context.params;
 
-    const token = (await cookies()).get("token")?.value;
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET!);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET!
+    ) as JwtPayload;
 
     const issue = await Issue.findById(id);
 
@@ -27,38 +34,15 @@ export async function GET(
       return NextResponse.json({ error: "Issue not found" }, { status: 404 });
     }
 
-    return NextResponse.json(issue);
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE issue
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    await connectDB();
-
-    const { id } = await params;
-
-    const token = (await cookies()).get("token")?.value;
-    if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (issue.userId.toString() !== decoded.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    jwt.verify(token, process.env.JWT_SECRET!);
+    await issue.deleteOne();
 
-    const deleted = await Issue.findByIdAndDelete(id);
-
-    return NextResponse.json({
-      message: deleted ? "Issue deleted successfully" : "Issue already deleted",
-    });
+    return NextResponse.json({ message: "Issue deleted successfully" });
   } catch (err) {
+    console.error("DELETE ISSUE ERROR:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
