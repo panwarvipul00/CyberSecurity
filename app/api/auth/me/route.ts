@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
 
 export async function GET() {
   try {
-    const token = cookies().get("token")?.value;
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
     if (!token) {
       return NextResponse.json(
         { error: "Not authenticated" },
@@ -12,12 +14,10 @@ export async function GET() {
       );
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
-      id: string;
-    };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!);
 
-    return NextResponse.json({ userId: decoded.id });
-  } catch (err) {
+    return NextResponse.json({ user: decoded });
+  } catch {
     return NextResponse.json(
       { error: "Invalid token" },
       { status: 401 }

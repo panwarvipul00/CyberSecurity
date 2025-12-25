@@ -5,48 +5,36 @@ import jwt from "jsonwebtoken";
 import { connectDB } from "@/lib/db";
 import Issue from "@/models/Issue";
 
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  await connectDB();
-
-  const { id } = await context.params;
-
-  const token = (await cookies()).get("token")?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET!);
-
-  const issue = await Issue.findById(id);
-  if (!issue) {
-    return NextResponse.json({ error: "Issue not found" }, { status: 404 });
-  }
-
-  return NextResponse.json(issue);
-}
-
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  await connectDB();
+  try {
+    await connectDB();
 
-  const { id } = await context.params;
+    const { id } = await context.params;
 
-  const token = (await cookies()).get("token")?.value;
-  if (!token) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token")?.value;
+
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET!);
+
+    const deleted = await Issue.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "Issue deleted successfully" });
+  } catch (err) {
+    console.error("DELETE ISSUE ERROR:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
-
-  jwt.verify(token, process.env.JWT_SECRET!);
-
-  const deleted = await Issue.findByIdAndDelete(id);
-  if (!deleted) {
-    return NextResponse.json({ error: "Issue not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ message: "Issue deleted successfully" });
 }
