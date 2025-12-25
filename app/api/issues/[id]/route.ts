@@ -4,40 +4,31 @@ import jwt from "jsonwebtoken";
 import { connectDB } from "@/lib/db";
 import Issue from "@/models/Issue";
 
-export async function DELETE(
+// GET single issue
+export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
 
+    const { id } = await params;
+
     const token = (await cookies()).get("token")?.value;
     if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     jwt.verify(token, process.env.JWT_SECRET!);
 
-    // Try delete
-    const deleted = await Issue.findByIdAndDelete(params.id);
+    const issue = await Issue.findById(id);
 
-    // ✅ If already deleted, treat as success
-    if (!deleted) {
-      return NextResponse.json(
-        { message: "Issue already deleted" },
-        { status: 200 }
-      );
+    if (!issue) {
+      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
     }
 
-    return NextResponse.json(
-      { message: "Issue deleted successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json(issue);
   } catch (err) {
-    console.error("DELETE ISSUE ERROR:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -45,3 +36,32 @@ export async function DELETE(
   }
 }
 
+// DELETE issue
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await connectDB();
+
+    const { id } = await params;
+
+    const token = (await cookies()).get("token")?.value;
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET!);
+
+    const deleted = await Issue.findByIdAndDelete(id);
+
+    return NextResponse.json({
+      message: deleted ? "Issue deleted successfully" : "Issue already deleted",
+    });
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
